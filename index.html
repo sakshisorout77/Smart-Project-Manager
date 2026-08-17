@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Project Manager</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+<!-- LOGIN PAGE -->
+<div id="loginPage" class="login-page">
+
+    <div class="login-card">
+
+        <div class="login-logo">
+            ✓
+        </div>
+
+        <h1>Welcome Back 👋</h1>
+
+        <p>Login to your Smart Project Manager</p>
+
+        <form id="loginForm">
+
+            <div class="login-input">
+                <label>Email</label>
+                <input
+                    type="email"
+                    id="loginEmail"
+                    placeholder="Enter your email"
+                    required
+                >
+            </div>
+
+            <div class="login-input">
+                <label>Password</label>
+                <input
+                    type="password"
+                    id="loginPassword"
+                    placeholder="Enter your password"
+                    required
+                >
+            </div>
+
+            <button type="submit" class="login-btn">
+                🔐 Login
+            </button>
+
+        </form>
+
+        <p id="loginMessage"></p>
+
+<p class="register-text">
+    Don't have an account?
+    <a href="#" id="showRegister">Create Account</a>
+</p>
+
+</div>
+
+
+<!-- REGISTER PAGE -->
+<div id="registerPage" class="register-page">
+
+    <div class="login-card">
+
+        <div class="login-logo">
+            ✓
+        </div>
+
+        <h1>Create Account</h1>
+
+        <p>Create your Smart Project Manager account</p>
+
+        <form id="registerForm">
+
+            <div class="login-input">
+                <label>Full Name</label>
+
+                <input
+                    type="text"
+                    id="registerName"
+                    placeholder="Enter your full name"
+                    required
+                >
+            </div>
+
+            <div class="login-input">
+                <label>Email</label>
+
+                <input
+                    type="email"
+                    id="registerEmail"
+                    placeholder="Enter your email"
+                    required
+                >
+            </div>
+
+            <div class="login-input">
+                <label>Password</label>
+
+                <input
+                    type="password"
+                    id="registerPassword"
+                    placeholder="Create a password"
+                    required
+                >
+            </div>
+
+            <div class="login-input">
+                <label>Confirm Password</label>
+
+                <input
+                    type="password"
+                    id="confirmPassword"
+                    placeholder="Confirm your password"
+                    required
+                >
+            </div>
+
+            <button type="submit" class="login-btn">
+                📝 Create Account
+            </button>
+
+        </form>
+
+        <p id="registerMessage"></p>
+
+        <p class="register-text">
+            Already have an account?
+            <a href="#" id="showLogin">Login</a>
+        </p>
+
+    </div>
+
+</div>
+
+</div>
+
+</div>
+
+<div class="app">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+
+        <div class="logo">
+            <div class="logo-icon">✓</div>
+            <div>
+                <h2>Smart PM</h2>
+                <span>Project Manager</span>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+
+            <a href="#dashboard" class="nav-item active">
+                🏠 <span>Dashboard</span>
+            </a>
+
+            <a href="#projectsSection" class="nav-item">
+                📁 <span>Projects</span>
+            </a>
+
+            <a href="#tasksSection" class="nav-item">
+                ✅ <span>My Tasks</span>
+            </a>
+
+            <a href="#aiSection" class="nav-item">
+                🤖 <span>AI Assistant</span>
+            </a>
+
+            <a href="#analyticsSection" class="nav-item">
+                📊 <span>Analytics</span>
+            </a>
+
+        </nav>
+
+        <div class="sidebar-bottom">
+
+            <a href="#settingsSection" class="nav-item">
+                ⚙️ <span>Settings</span>
+            </a>
+
+        </div>
+
+    </aside>
+
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+
+        <!-- TOP HEADER -->
+        <header class="top-header">
+
+            <div>
+                <p class="welcome-text">Welcome back 👋</p>
+                <h1>Smart Project Manager</h1>
+                <p class="subtitle">
+                    Plan, manage and complete your projects smarter.
+                </p>
+            </div>
+
+            <div class="header-badge">
+                🚀 Productivity Mode
+            </div>
+            <button id="logoutBtn" class="logout-btn">
+    🚪 Logout
+</button>
+
+        </header>
+
+
+        <!-- DASHBOARD -->
+        <section class="dashboard" id="dashboard">
+
+            <div class="card dashboard-card">
+                <div class="card-icon">📁</div>
+                <div>
+                    <h3>Total Projects</h3>
+                    <p id="totalProjects">0</p>
+                </div>
+            </div>
+
+            <div class="card dashboard-card">
+                <div class="card-icon">⏳</div>
+                <div>
+                    <h3>Pending Tasks</h3>
+                    <p id="pendingTasks">0</p>
+                </div>
+            </div>
+
+            <div class="card dashboard-card">
+                <div class="card-icon">✅</div>
+                <div>
+                    <h3>Completed Tasks</h3>
+                    <p id="completedTasks">0</p>
+                </div>
+            </div>
+
+            <div class="card dashboard-card">
+                <div class="card-icon">📈</div>
+                <div>
+                    <h3>Overall Progress</h3>
+                    <p id="overallProgress">0%</p>
+
+                    <div class="progress-bar">
+                        <div id="progressFill"></div>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+
+        <!-- CREATE PROJECT -->
+        <section class="project-section" id="projectsSection">
+
+            <div class="section-heading">
+                <div>
+                    <h2>📁 Create New Project</h2>
+                    <p>Start a new project and organize your work.</p>
+                </div>
+            </div>
+
+            <div class="form-row">
+
+                <input
+                    type="text"
+                    id="projectName"
+                    placeholder="Enter project name"
+                >
+
+                <button id="createProjectBtn">
+    + Create Project
+</button>
+            </div>
+
+            <p id="message"></p>
+
+        </section>
+
+
+        <!-- MY PROJECTS -->
+        <section class="projects-list-section">
+
+            <div class="section-heading">
+
+                <div>
+                    <h2>📂 My Projects</h2>
+                    <p>Your current projects</p>
+                </div>
+
+            </div>
+
+            <div id="projectsContainer">
+
+                <p>No projects created yet.</p>
+
+            </div>
+
+        </section>
+
+
+        <!-- ADD TASK -->
+        <section class="task-section" id="tasksSection">
+
+            <div class="section-heading">
+
+                <div>
+                    <h2>➕ Add New Task</h2>
+                    <p>Create tasks and manage your daily work.</p>
+                </div>
+
+            </div>
+
+            <div class="form-row task-form">
+
+                <input
+                    type="text"
+                    id="taskName"
+                    placeholder="Enter task name"
+                >
+                <select id="taskProjectInput">
+    <option value="General">General</option>
+</select>
+
+                <select id="taskPriority">
+
+                    <option value="Low">
+                        Low Priority
+                    </option>
+
+                    <option value="Medium">
+                        Medium Priority
+                    </option>
+
+                    <option value="High">
+                        High Priority
+                    </option>
+
+                </select>
+
+                <input
+                    type="date"
+                    id="taskDueDate"
+                >
+
+                <button id="addTaskBtn">
+                    + Add Task
+                </button>
+
+            </div>
+
+            <p id="taskMessage"></p>
+
+        </section>
+
+
+        <!-- MY TASKS -->
+        <section class="tasks-list-section">
+
+            <div class="section-heading">
+
+                <div>
+                    <h2>✅ My Tasks</h2>
+                    <p>Search, filter and manage your tasks.</p>
+                </div>
+
+            </div>
+
+
+            <div class="task-filters">
+
+                <input
+                    type="text"
+                    id="taskSearch"
+                    placeholder="🔎 Search tasks..."
+                >
+
+                <select id="taskProjectFilter">
+    <option value="all">All Projects</option>
+</select>
+
+                <select id="taskFilter">
+
+                    <option value="all">
+                        All Tasks
+                    </option>
+
+                    <option value="pending">
+                        Pending
+                    </option>
+
+                    <option value="completed">
+                        Completed
+                    </option>
+
+                    <option value="high">
+                        High Priority
+                    </option>
+
+                    <option value="medium">
+                        Medium Priority
+                    </option>
+
+                    <option value="low">
+                        Low Priority
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <div id="tasksContainer">
+
+                <p>No tasks added yet.</p>
+
+            </div>
+
+        </section>
+
+
+        <!-- AI ASSISTANT -->
+        <section class="ai-section" id="aiSection">
+
+            <div class="ai-header">
+
+                <div class="ai-icon">
+                    🤖
+                </div>
+
+                <div>
+                    <h2>AI Project Assistant</h2>
+
+                    <p>
+                        Get AI-powered project ideas, task suggestions,
+                        priorities and planning help.
+                    </p>
+                </div>
+
+            </div>
+
+
+            <textarea
+                id="aiPrompt"
+                placeholder="Example: Create a task plan for my portfolio website..."
+            ></textarea>
+
+
+            <button id="askAiBtn">
+                🤖 Ask AI
+            </button>
+
+
+            <div id="aiResponse">
+
+                <p>
+                    AI suggestions will appear here.
+                </p>
+
+            </div>
+
+
+            <div id="aiTasksContainer"></div>
+
+        </section>
+
+
+        <!-- ANALYTICS -->
+<section id="analyticsSection" class="analytics-section">
+
+    <div class="section-heading">
+        <div>
+            <h2>📊 Analytics & Insights</h2>
+            <p>Track your productivity and task performance.</p>
+        </div>
+    </div>
+
+    <div class="analytics-grid">
+
+        <div class="analytics-card">
+            <div class="analytics-icon">📋</div>
+            <div>
+                <span>Total Tasks</span>
+                <strong id="analyticsTotalTasks">0</strong>
+            </div>
+        </div>
+
+        <div class="analytics-card">
+            <div class="analytics-icon">⏳</div>
+            <div>
+                <span>Pending</span>
+                <strong id="analyticsPendingTasks">0</strong>
+            </div>
+        </div>
+
+        <div class="analytics-card">
+            <div class="analytics-icon">✅</div>
+            <div>
+                <span>Completed</span>
+                <strong id="analyticsCompletedTasks">0</strong>
+            </div>
+        </div>
+
+        <div class="analytics-card">
+            <div class="analytics-icon">🎯</div>
+            <div>
+                <span>Completion Rate</span>
+                <strong id="analyticsCompletionRate">0%</strong>
+            </div>
+        </div>
+
+    </div>
+
+
+    <div class="analytics-panels">
+
+        <div class="analytics-panel">
+
+            <h3>📈 Task Completion</h3>
+
+            <div class="analytics-progress">
+
+                <div class="analytics-progress-label">
+                    <span>Completed Tasks</span>
+                    <span id="completionPercentage">0%</span>
+                </div>
+
+                <div class="analytics-progress-bar">
+                    <div id="completionBar"></div>
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="analytics-panel">
+
+            <h3>🎯 Priority Distribution</h3>
+
+            <div class="priority-stat">
+                <span>🟢 Low</span>
+                <strong id="lowPriorityCount">0</strong>
+            </div>
+
+            <div class="priority-stat">
+                <span>🟡 Medium</span>
+                <strong id="mediumPriorityCount">0</strong>
+            </div>
+
+            <div class="priority-stat">
+                <span>🔴 High</span>
+                <strong id="highPriorityCount">0</strong>
+            </div>
+
+        </div>
+        <div class="analytics-panel">
+
+    <h3>📋 Tasks by Status</h3>
+
+    <div class="priority-stat">
+        <span>⏳ Pending</span>
+        <strong id="pendingStatusCount">0</strong>
+    </div>
+
+    <div class="priority-stat">
+        <span>🔄 In Progress</span>
+        <strong id="inProgressStatusCount">0</strong>
+    </div>
+
+    <div class="priority-stat">
+        <span>✅ Completed</span>
+        <strong id="completedStatusCount">0</strong>
+    </div>
+
+</div>
+<div class="analytics-panel">
+
+    <h3>📁 Project-wise Tasks</h3>
+
+    <div id="projectAnalytics">
+        <p>No project data available.</p>
+    </div>
+
+</div>
+        
+    </div>
+
+</section>
+        <!-- SETTINGS -->
+<section id="settingsSection" class="settings-section">
+
+    <div class="section-heading">
+        <div>
+            <h2>⚙️ Settings</h2>
+            <p>Customize your Smart Project Manager.</p>
+        </div>
+    </div>
+
+    <div class="settings-card">
+
+        <div class="setting-item">
+            <div>
+                <h3>🌙 Dark Mode</h3>
+                <p>Switch between light and dark appearance.</p>
+            </div>
+
+            <label class="switch">
+                <input type="checkbox" id="darkModeToggle">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div class="setting-item">
+            <div>
+                <h3>💾 Save Theme Preference</h3>
+                <p>Your selected theme will be remembered.</p>
+            </div>
+
+            <span class="setting-status">
+                Enabled
+            </span>
+        </div>
+
+        <div class="setting-item danger-setting">
+            <div>
+                <h3>🗑️ Clear All Data</h3>
+                <p>Delete all projects and tasks permanently.</p>
+            </div>
+
+            <button id="clearDataBtn" class="danger-btn">
+                Clear Data
+            </button>
+        </div>
+
+    </div>
+
+    <div id="settingsMessage"></div>
+
+</section>
+
+        <!-- FOOTER -->
+        <footer>
+
+            <p>
+                © 2026 Smart Project Manager
+            </p>
+
+            <span>
+                Built with HTML • CSS • JavaScript • Gemini AI
+            </span>
+
+        </footer>
+
+    </main>
+
+</div>
+
+
+<script src="script.js" defer></script>
+
+</body>
+</html>

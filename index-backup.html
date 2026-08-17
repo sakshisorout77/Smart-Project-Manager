@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Project Manager</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <header>
+        <h1>Smart Project Manager</h1>
+        <p>Plan, manage and complete your projects smarter.</p>
+    </header>
+
+    <main>
+
+        <section class="dashboard">
+            <div class="card">
+                <h3>Total Projects</h3>
+                <p id="totalProjects">0</p>
+            </div>
+
+            <div class="card">
+                <h3>Pending Tasks</h3>
+                <p id="pendingTasks">0</p>
+            </div>
+
+            <div class="card">
+                <h3>Completed Tasks</h3>
+                <p id="completedTasks">0</p>
+            </div>
+
+            <div class="card">
+    <h3>Overall Progress</h3>
+
+    <p id="overallProgress">0%</p>
+
+    <div class="progress-bar">
+        <div id="progressFill"></div>
+    </div>
+</div>
+        </section>
+
+        <section class="project-section">
+
+            <h2>Create New Project</h2>
+
+            <input 
+                type="text" 
+                id="projectName" 
+                placeholder="Enter project name"
+            >
+
+            <button id="createProjectBtn">
+                Create Project
+            </button>
+
+            <p id="message"></p>
+
+        </section>
+        <section>
+            <h2>My Projects</h2>
+
+            <div id="projectsContainer">
+                <p>No projects created yet.</p>
+            </div>
+        </section>
+<section class="task-section">
+
+    <h2>Add New Task</h2>
+
+    <input
+        type="text"
+        id="taskName"
+        placeholder="Enter task name"
+    >
+
+    <select id="taskPriority">
+        <option value="Low">Low Priority</option>
+        <option value="Medium">Medium Priority</option>
+        <option value="High">High Priority</option>
+    </select>
+
+    <input
+        type="date"
+        id="taskDueDate"
+    >
+
+    <button id="addTaskBtn">
+        Add Task
+    </button>
+
+    <p id="taskMessage"></p>
+
+</section>
+
+<section>
+    <h2>My Tasks</h2>
+    <div class="task-filters">
+
+    <input
+        type="text"
+        id="taskSearch"
+        placeholder="🔎 Search tasks..."
+    >
+
+    <select id="taskFilter">
+        <option value="all">All Tasks</option>
+        <option value="pending">Pending</option>
+        <option value="completed">Completed</option>
+        <option value="high">High Priority</option>
+        <option value="medium">Medium Priority</option>
+        <option value="low">Low Priority</option>
+    </select>
+
+</div>
+
+    <div id="tasksContainer">
+        <p>No tasks added yet.</p>
+    </div>
+</section>
+
+<section class="ai-section">
+
+    <h2>🤖 AI Project Assistant</h2>
+
+    <p>
+        Ask AI for project ideas, task suggestions, priorities,
+        or project planning help.
+    </p>
+
+    <textarea
+    id="aiPrompt"
+    placeholder="Example: Create a task plan for my portfolio website..."
+></textarea>
+
+<button id="askAiBtn">
+    Ask AI
+</button>
+
+<div id="aiResponse">
+    <p>AI suggestions will appear here.</p>
+</div>
+
+<div id="aiTasksContainer"></div>
+
+</section>
+    </main>
+
+    <script src="script.js"></script>
+
+</body>
+</html>
