@@ -9,101 +9,627 @@
 let projects = [];
 let tasks = [];
 
+// ===============================
+// TEAM & ROLE SYSTEM
+// ===============================
+
+let teamMembers = [];
+
+const ROLE_MANAGER = "Manager";
+const ROLE_CONTRIBUTOR = "Contributor";
+const ROLE_VIEWER = "Viewer";
+
+function getCurrentUser() {
+    return JSON.parse(localStorage.getItem("currentUser")) || null;
+}
+
+function getUserRole() {
+    const currentUser = getCurrentUser();
+
+    if (!currentUser) {
+        return null;
+    }
+
+    const member = teamMembers.find(
+        member => member.email === currentUser.email
+    );
+
+    return member ? member.role : null;
+}
+
+function isManager() {
+    return getUserRole() === ROLE_MANAGER;
+}
+
+function isViewer() {
+    return getUserRole() === ROLE_VIEWER;
+}
 
 // ===============================
-// LOAD SAVED DATA SAFELY
+// LOAD TEAM MEMBERS
 // ===============================
 
-function loadData() {
+async function loadTeamData() {
+
+    const currentUser = getCurrentUser();
+
+    if (!currentUser) {
+        teamMembers = [];
+        return;
+    }
 
     try {
 
-        const currentUser =
-            JSON.parse(
-                localStorage.getItem("currentUser")
-            );
+        const response = await fetch(
+            "http://localhost:3000/api/team?teamId=TEAM001"
+        );
 
-        if (!currentUser || !currentUser.email) {
+        const data = await response.json();
 
-            projects = [];
-            tasks = [];
+        if (!response.ok) {
 
+            console.error(data.error);
+            teamMembers = [];
             return;
         }
 
-        const userKey =
-            currentUser.email
-                .replace(/[^a-zA-Z0-9]/g, "_");
+        teamMembers = data.map(member => ({
+            name: member.name,
+            email: member.email,
+            role: member.role
+        }));
 
-        const projectKey =
-            "projects_" + userKey;
+        // If no team exists, make the first logged-in user Manager
+        if (teamMembers.length === 0) {
 
-        const taskKey =
-            "tasks_" + userKey;
+            const managerResponse = await fetch(
+                "http://localhost:3000/api/team",
+                {
+                    method: "POST",
 
-        const savedProjects =
-            localStorage.getItem(projectKey);
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
 
-        const savedTasks =
-            localStorage.getItem(taskKey);
-
-        const oldProjects =
-            localStorage.getItem("projects");
-
-        const oldTasks =
-            localStorage.getItem("tasks");
-
-        if (!savedProjects && oldProjects) {
-
-            localStorage.setItem(
-                projectKey,
-                oldProjects
+                   body: JSON.stringify({
+    teamId: "TEAM001",
+    name: currentUser.name,
+    email: currentUser.email,
+    role: ROLE_MANAGER
+})
+                }
             );
 
-            localStorage.removeItem("projects");
-        }
+            const managerData =
+                await managerResponse.json();
 
-        if (!savedTasks && oldTasks) {
+            if (managerResponse.ok) {
 
-            localStorage.setItem(
-                taskKey,
-                oldTasks
-            );
+                teamMembers.push({
+                    name: managerData.member.name,
+                    email: managerData.member.email,
+                    role: managerData.member.role
+                });
 
-            localStorage.removeItem("tasks");
-        }
-
-        projects =
-            JSON.parse(
-                localStorage.getItem(projectKey)
-            ) || [];
-
-        tasks =
-            JSON.parse(
-                localStorage.getItem(taskKey)
-            ) || [];
-
-        if (!Array.isArray(projects)) {
-            projects = [];
-        }
-
-        if (!Array.isArray(tasks)) {
-            tasks = [];
+            }
         }
 
     } catch (error) {
 
         console.error(
-            "Error loading user data:",
+            "Load Team Error:",
+            error
+        );
+
+        teamMembers = [];
+    }
+}
+// ===============================
+// SAVE TEAM MEMBERS
+// ===============================
+
+function saveTeamData() {
+
+    localStorage.setItem(
+        "teamMembers",
+        JSON.stringify(teamMembers)
+    );
+}
+
+
+// ===============================
+// DISPLAY TEAM MEMBERS
+// ===============================
+
+function displayTeamMembers() {
+
+    const container =
+        document.getElementById("teamMembersContainer");
+
+    const roleBadge =
+        document.getElementById("currentUserRole");
+
+    const addMemberBox =
+        document.getElementById("addMemberBox");
+
+    const createProjectBtn =
+        document.getElementById("createProjectBtn");
+
+    const addTaskBtn =
+        document.getElementById("addTaskBtn");
+
+    const currentRole = getUserRole();
+
+    if (currentRole === ROLE_VIEWER) {
+
+        if (createProjectBtn) {
+            createProjectBtn.style.display = "none";
+        }
+
+        if (addTaskBtn) {
+            addTaskBtn.style.display = "none";
+        }
+
+    } else {
+
+        if (createProjectBtn) {
+            createProjectBtn.style.display = "inline-block";
+        }
+
+        if (addTaskBtn) {
+            addTaskBtn.style.display = "inline-block";
+        }
+    }
+
+    if (!container) return;
+
+    if (roleBadge) {
+        roleBadge.textContent =
+            "Role: " + (currentRole || "No Access");
+    }
+if (addMemberBox) {
+    addMemberBox.style.display = isManager() ? "block" : "none";
+}
+    if (teamMembers.length === 0) {
+        container.innerHTML =
+            "<p>No team members found.</p>";
+        return;
+    }
+
+    container.innerHTML = teamMembers.map(
+        (member, index) => {
+            const isCurrentUser =
+                getCurrentUser()?.email === member.email;
+            const memberActionsHtml =
+                currentRole === ROLE_MANAGER && !isCurrentUser
+                    ? `
+                        <div class="member-action-buttons" role="group">
+                            <button onclick="changeMemberRole(${index})">
+                                Change Role
+                            </button>
+
+                            <button
+                                class="danger-btn"
+                                onclick="removeTeamMember(${index})"
+                            >
+                                Remove
+                            </button>
+                        </div>
+                    `
+                    : "";
+
+            return '<div class="team-member-card">' +
+                '<div class="member-info">' +
+                    '<div class="member-avatar">' +
+                        member.name.charAt(0).toUpperCase() +
+                    '</div>' +
+                    '<div>' +
+                        '<h3>' +
+                            escapeHTML(member.name) +
+                            (isCurrentUser ? " (You)" : "") +
+                        '</h3>' +
+                        '<p>' + escapeHTML(member.email) + '</p>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="member-actions">' +
+                    '<span class="role-badge">' +
+                        escapeHTML(member.role) +
+                    '</span>' +
+                    memberActionsHtml +
+                '</div>' +
+            '</div>';
+        }
+    ).join("");
+}
+
+// ===============================
+// ADD TEAM MEMBER
+// ===============================
+
+async function addTeamMember() {
+
+    if (!isManager()) {
+
+        alert("Only Manager can add team members.");
+
+        return;
+    }
+
+    const nameInput =
+        document.getElementById("memberName");
+
+    const emailInput =
+        document.getElementById("memberEmail");
+
+    const roleInput =
+        document.getElementById("memberRole");
+
+    const teamMessage =
+        document.getElementById("teamMessage");
+
+    const name =
+        nameInput.value.trim();
+
+    const email =
+        emailInput.value.trim().toLowerCase();
+
+    const role =
+        roleInput.value;
+
+    if (!name || !email) {
+
+        teamMessage.textContent =
+            "Please enter member name and email.";
+
+        teamMessage.style.color = "red";
+
+        return;
+    }
+
+    // Check duplicate member
+    const alreadyMember =
+        teamMembers.some(
+            member => member.email === email
+        );
+
+    if (alreadyMember) {
+
+        teamMessage.textContent =
+            "❌ This user is already in the team.";
+
+        teamMessage.style.color = "red";
+
+        return;
+    }
+
+    try {
+
+        const response = await fetch(
+            "http://localhost:3000/api/team",
+            {
+                method: "POST",
+
+                headers: {
+                    "Content-Type": "application/json"
+                },
+
+                body: JSON.stringify({
+                    name: name,
+                    email: email,
+                    role: role
+                })
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+
+            teamMessage.textContent =
+                "❌ " + data.error;
+
+            teamMessage.style.color = "red";
+
+            return;
+        }
+
+        teamMembers.push({
+            name: data.member.name,
+            email: data.member.email,
+            role: data.member.role
+        });
+
+        displayTeamMembers();
+
+        nameInput.value = "";
+        emailInput.value = "";
+        roleInput.value = ROLE_CONTRIBUTOR;
+
+        teamMessage.textContent =
+            "✅ Team member added successfully.";
+
+        teamMessage.style.color = "green";
+
+    } catch (error) {
+
+        console.error(
+            "Add Team Member Error:",
+            error
+        );
+
+        teamMessage.textContent =
+            "❌ Server connection failed.";
+
+        teamMessage.style.color = "red";
+    }
+}
+saveTeamData();
+        displayTeamMembers();
+// ===============================
+// REMOVE TEAM MEMBER
+// ===============================
+
+async function removeTeamMember(index) {
+
+    if (!isManager()) {
+
+        alert("Only Manager can remove members.");
+
+        return;
+    }
+
+    const member =
+        teamMembers[index];
+
+    if (!member) return;
+
+    const currentUser =
+        getCurrentUser();
+
+    // Manager cannot remove himself
+    if (
+        currentUser &&
+        member.email === currentUser.email
+    ) {
+
+        alert("You cannot remove yourself from the team.");
+
+        return;
+    }
+
+    const confirmRemove =
+        confirm(
+            `Remove ${member.name} from the team?`
+        );
+
+    if (!confirmRemove) return;
+
+    try {
+
+        const response = await fetch(
+            "http://localhost:3000/api/team/" +
+            encodeURIComponent(member.email),
+            {
+                method: "DELETE"
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+
+            alert(
+                data.error ||
+                "Unable to remove team member."
+            );
+
+            return;
+        }
+
+        teamMembers.splice(index, 1);
+
+        saveTeamData();
+        displayTeamMembers();
+
+    } catch (error) {
+
+        console.error(
+            "Remove Team Member Error:",
+            error
+        );
+
+        alert("Server connection failed.");
+    }
+}
+
+// ===============================
+// CHANGE MEMBER ROLE
+// ===============================
+async function changeMemberRole(index) {
+
+    if (!isManager()) {
+
+        alert("Only Manager can change roles.");
+
+        return;
+    }
+
+    const member =
+        teamMembers[index];
+
+    if (!member) return;
+
+    const newRole =
+        prompt(
+            `Enter new role for ${member.name}:\n\nManager\nContributor\nViewer`,
+            member.role
+        );
+
+    if (!newRole) return;
+
+    const validRoles = [
+        ROLE_MANAGER,
+        ROLE_CONTRIBUTOR,
+        ROLE_VIEWER
+    ];
+
+    if (!validRoles.includes(newRole)) {
+
+        alert(
+            "Invalid role. Please use Manager, Contributor or Viewer."
+        );
+
+        return;
+    }
+
+    try {
+
+        const response = await fetch(
+            "http://localhost:3000/api/team/" +
+            encodeURIComponent(member.email),
+            {
+                method: "PUT",
+
+                headers: {
+                    "Content-Type": "application/json"
+                },
+
+                body: JSON.stringify({
+                    role: newRole
+                })
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+
+            alert(
+                data.error ||
+                "Unable to change role."
+            );
+
+            return;
+        }
+
+        member.role = data.member.role;
+
+        displayTeamMembers();
+
+    } catch (error) {
+
+        console.error(
+            "Change Role Error:",
+            error
+        );
+
+        alert("Server connection failed.");
+    }
+}
+
+// ===============================
+// TEAM BUTTON EVENT
+// ===============================
+
+const addMemberBtn =
+    document.getElementById("addMemberBtn");
+
+if (addMemberBtn) {
+
+    addMemberBtn.addEventListener(
+        "click",
+        addTeamMember
+    );
+}
+// ===============================
+// LOAD SAVED DATA SAFELY
+// ===============================
+
+async function loadData() {
+
+    const currentUser = getCurrentUser();
+
+    if (!currentUser || !currentUser.email) {
+        projects = [];
+        tasks = [];
+        return;
+    }
+
+    try {
+
+        const response = await fetch(
+            "http://localhost:3000/api/projects?teamId=TEAM001"
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            console.error(data.error);
+            projects = [];
+        } else {
+            projects = data.map(project => ({
+                name: project.name,
+                createdAt: project.createdAt,
+                progress: project.progress
+            }));
+        }
+
+    } catch (error) {
+
+        console.error(
+            "Load Projects Error:",
             error
         );
 
         projects = [];
+    }
+
+    // Tasks MongoDB se load honge
+try {
+
+    const taskResponse = await fetch(
+        "http://localhost:3000/api/tasks?teamId=TEAM001"
+    );
+
+    const taskData = await taskResponse.json();
+
+    if (!taskResponse.ok) {
+
+        console.error(taskData.error);
+
+        tasks = [];
+
+    } else {
+
+        tasks = taskData.map(task => ({
+            name: task.name,
+            project: task.projectName,
+            priority: task.priority,
+            dueDate: task.dueDate,
+            status: task.status
+        }));
+
+    }
+
+} catch (error) {
+
+    console.error(
+        "Load Tasks Error:",
+        error
+    );
+
+    tasks = [];
+}
+
+
+    if (!Array.isArray(projects)) {
+        projects = [];
+    }
+
+    if (!Array.isArray(tasks)) {
         tasks = [];
     }
 }
-
-loadData();
 // ===============================
 // INPUT ELEMENTS
 // ===============================
@@ -186,54 +712,86 @@ function saveData() {
 // CREATE PROJECT
 // ===============================
 
-function createProject() {
+async function createProject() {
+
+    if (isViewer()) {
+        alert("Viewers cannot create projects.");
+        return;
+    }
 
     if (!projectNameInput) {
         return;
     }
 
-    const projectName =
-        projectNameInput.value.trim();
+    const projectName = projectNameInput.value.trim();
 
     if (projectName === "") {
-
         if (message) {
-            message.textContent =
-                "Please enter a project name.";
+            message.textContent = "Please enter a project name.";
         }
-
         return;
     }
 
-    const project = {
+    const currentUser = getCurrentUser();
 
-        name: projectName,
-
-        createdAt:
-            new Date().toLocaleDateString(),
-
-        progress: 0
-    };
-
-    projects.push(project);
-
-    saveData();
-
-    displayProjects();
-    updateTaskProjectDropdown();
-    updateTaskProjectFilter();
-    updateDashboard();
-
-    if (message) {
-
-        message.textContent =
-            "Project created successfully.";
+    if (!currentUser) {
+        alert("Please login first.");
+        return;
     }
 
-    projectNameInput.value = "";
+    try {
+
+        const response = await fetch("http://localhost:3000/api/projects", {
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+                name: projectName,
+                createdBy: currentUser.email,
+                teamId: "TEAM001"
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            alert(data.error || "Unable to create project.");
+            return;
+        }
+
+        // Add returned project to current UI
+        projects.push({
+            name: data.project.name,
+            createdAt: data.project.createdAt,
+            progress: data.project.progress
+        });
+
+        displayProjects();
+        updateTaskProjectDropdown();
+        updateTaskProjectFilter();
+        displayTasks();
+        updateDashboard();
+
+        if (message) {
+            message.textContent =
+                "Project created successfully.";
+        }
+
+        projectNameInput.value = "";
+
+    } catch (error) {
+
+        console.error("Project Error:", error);
+
+        if (message) {
+            message.textContent =
+                "❌ Server connection failed.";
+        }
+    }
 }
-
-
 // ===============================
 // DISPLAY PROJECTS
 // ===============================
@@ -569,7 +1127,12 @@ function updateTaskProjectFilter() {
 // ADD TASK
 // ===============================
 
-function addTask() {
+async function addTask() {
+
+    if (isViewer()) {
+        alert("Viewers cannot add tasks.");
+        return;
+    }
 
     if (!taskNameInput) {
         return;
@@ -581,7 +1144,6 @@ function addTask() {
     if (taskName === "") {
 
         if (taskMessage) {
-
             taskMessage.textContent =
                 "Please enter a task name.";
         }
@@ -589,60 +1151,101 @@ function addTask() {
         return;
     }
 
-
     const projectInput =
-        document.getElementById(
-            "taskProjectInput"
+        document.getElementById("taskProjectInput");
+
+    const currentUser = getCurrentUser();
+
+    if (!currentUser) {
+        alert("Please login first.");
+        return;
+    }
+
+    const projectName =
+        projectInput
+            ? projectInput.value
+            : "General";
+
+    const priority =
+        taskPriorityInput
+            ? taskPriorityInput.value
+            : "Low";
+
+    const dueDate =
+        taskDueDateInput
+            ? taskDueDateInput.value
+            : "";
+
+    try {
+
+        const response = await fetch(
+            "http://localhost:3000/api/tasks",
+            {
+                method: "POST",
+
+                headers: {
+                    "Content-Type": "application/json"
+                },
+
+                body: JSON.stringify({
+                    name: taskName,
+                    projectName: projectName,
+                    priority: priority,
+                    dueDate: dueDate,
+                    createdBy: currentUser.email,
+                    teamId: "TEAM001"
+                })
+            }
         );
 
+        const data = await response.json();
 
-    const task = {
+        if (!response.ok) {
+            alert(
+                data.error ||
+                "Unable to create task."
+            );
+            return;
+        }
 
-        name: taskName,
+        // Add task to current UI
+        tasks.push({
+            name: data.task.name,
+            project: data.task.projectName,
+            priority: data.task.priority,
+            dueDate: data.task.dueDate,
+            status: data.task.status,
+            teamId: data.task.teamId
+        });
 
-        project:
-            projectInput
-                ? projectInput.value
-                : "General",
+        displayTasks();
+        displayProjects();
+        updateDashboard();
 
-        priority:
-            taskPriorityInput
-                ? taskPriorityInput.value
-                : "Low",
+        if (taskMessage) {
+            taskMessage.textContent =
+                "Task added successfully.";
+        }
 
-        dueDate:
-            taskDueDateInput
-                ? taskDueDateInput.value
-                : "",
+        taskNameInput.value = "";
 
-        status: "Pending"
-    };
+        if (taskDueDateInput) {
+            taskDueDateInput.value = "";
+        }
 
+    } catch (error) {
 
-    tasks.push(task);
+        console.error(
+            "Task Error:",
+            error
+        );
 
-    saveData();
-
-    displayTasks();
-    displayProjects();
-    updateDashboard();
-
-
-    if (taskMessage) {
-
-        taskMessage.textContent =
-            "Task added successfully.";
-    }
-
-
-    taskNameInput.value = "";
-
-    if (taskDueDateInput) {
-
-        taskDueDateInput.value = "";
+        if (taskMessage) {
+            taskMessage.textContent =
+                "❌ Server connection failed.";
+        }
     }
 }
-
 
 // ===============================
 // DISPLAY TASKS
@@ -980,6 +1583,11 @@ function displayTasks() {
 
 function completeTask(index) {
 
+     if (isViewer()) {
+        alert("Viewers cannot complete tasks.");
+        return;
+    }
+
     if (!tasks[index]) {
         return;
     }
@@ -1004,6 +1612,11 @@ function completeTask(index) {
 
 function deleteTask(index) {
 
+     if (!isManager()) {
+        alert("Only Manager can delete tasks.");
+        return;
+    }
+
     if (!tasks[index]) {
         return;
     }
@@ -1023,6 +1636,11 @@ function deleteTask(index) {
 // ===============================
 
 function editTask(index) {
+
+      if (isViewer()) {
+        alert("Viewers cannot edit tasks.");
+        return;
+    }
 
     const task =
         tasks[index];
@@ -1169,6 +1787,11 @@ function editTask(index) {
 
 function deleteProject(index) {
 
+     if (!isManager()) {
+        alert("Only Manager can delete projects.");
+        return;
+    }
+
     if (!projects[index]) {
         return;
     }
@@ -1227,6 +1850,11 @@ function deleteProject(index) {
 // ===============================
 
 function editProject(index) {
+
+     if (!isManager()) {
+        alert("Only Manager can edit projects.");
+        return;
+    }
 
     if (!projects[index]) {
         return;
@@ -2192,7 +2820,7 @@ showLogin.addEventListener("click", function (event) {
 
 const registerForm = document.getElementById("registerForm");
 
-registerForm.addEventListener("submit", function (event) {
+registerForm.addEventListener("submit", async function (event) {
 
     event.preventDefault();
 
@@ -2215,57 +2843,59 @@ registerForm.addEventListener("submit", function (event) {
         return;
     }
 
-    // Get existing users
-    const users =
-        JSON.parse(localStorage.getItem("users")) || [];
+    try {
 
-    // Check duplicate email
-    const existingUser =
-        users.find(user => user.email === email);
+        const response = await fetch("http://localhost:3000/api/register", {
+            method: "POST",
 
-    if (existingUser) {
+            headers: {
+                "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+                name: name,
+                email: email,
+                password: password
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+
+            registerMessage.textContent =
+                "❌ " + data.error;
+
+            registerMessage.style.color = "red";
+
+            return;
+        }
 
         registerMessage.textContent =
-            "⚠️ An account with this email already exists.";
+            "✅ Account created successfully!";
+
+        registerMessage.style.color = "green";
+
+        registerForm.reset();
+
+        setTimeout(function () {
+
+            registerPage.style.display = "none";
+            loginPage.querySelector(".login-card").style.display = "block";
+
+            registerMessage.textContent = "";
+
+        }, 1500);
+
+    } catch (error) {
+
+        console.error("Registration Error:", error);
+
+        registerMessage.textContent =
+            "❌ Server connection failed.";
 
         registerMessage.style.color = "red";
-
-        return;
     }
-
-    // Create new user
-    const newUser = {
-        name: name,
-        email: email,
-        password: password
-    };
-
-    users.push(newUser);
-
-    // Save user
-    localStorage.setItem(
-        "users",
-        JSON.stringify(users)
-    );
-
-    registerMessage.textContent =
-        "✅ Account created successfully!";
-
-    registerMessage.style.color = "green";
-
-    // Clear form
-    registerForm.reset();
-
-    // Go back to login after 1.5 seconds
-    setTimeout(function () {
-
-        registerPage.style.display = "none";
-        loginPage.querySelector(".login-card").style.display = "block";
-
-        registerMessage.textContent = "";
-
-    }, 1500);
-
 });
 // ===============================
 // USER LOGIN
@@ -2273,7 +2903,7 @@ registerForm.addEventListener("submit", function (event) {
 
 const loginForm = document.getElementById("loginForm");
 
-loginForm.addEventListener("submit", function (event) {
+loginForm.addEventListener("submit", async function (event) {
 
     event.preventDefault();
 
@@ -2286,39 +2916,42 @@ loginForm.addEventListener("submit", function (event) {
     const loginMessage =
         document.getElementById("loginMessage");
 
-    // Get registered users
-    const users =
-        JSON.parse(localStorage.getItem("users")) || [];
+    try {
 
-    // Find matching user
-    const user =
-        users.find(
-            user =>
-                user.email === email &&
-                user.password === password
+        const response = await fetch("http://localhost:3000/api/login", {
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+                email: email,
+                password: password
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+
+            loginMessage.textContent =
+                "❌ " + data.error;
+
+            loginMessage.style.color = "red";
+
+            return;
+        }
+
+        // Save logged-in user
+        localStorage.setItem(
+            "currentUser",
+            JSON.stringify(data.user)
         );
 
-    // Invalid login
-    if (!user) {
-
-        loginMessage.textContent =
-            "❌ Invalid email or password.";
-
-        loginMessage.style.color = "red";
-
-        return;
-    }
-
-    // Save logged-in user
-    localStorage.setItem(
-        "currentUser",
-        JSON.stringify({
-            name: user.name,
-            email: user.email
-        })
-    );
-    // Load this user's projects and tasks
-loadData();
+        // Load this user's projects and tasks
+        await loadData();
+        await loadTeamData();
 
 displayProjects();
 updateTaskProjectDropdown();
@@ -2326,21 +2959,30 @@ updateTaskProjectFilter();
 displayTasks();
 updateDashboard();
 
-    loginMessage.textContent =
-        "✅ Login successful!";
+        loginMessage.textContent =
+            "✅ Login successful!";
 
-    loginMessage.style.color = "green";
+        loginMessage.style.color = "green";
 
-    // Clear login form
-    loginForm.reset();
+        // Clear login form
+        loginForm.reset();
 
-    // Hide login page
-    setTimeout(function () {
+        // Hide login page
+        setTimeout(function () {
 
-        loginPage.style.display = "none";
+            loginPage.style.display = "none";
 
-    }, 800);
+        }, 800);
 
+    } catch (error) {
+
+        console.error("Login Error:", error);
+
+        loginMessage.textContent =
+            "❌ Server connection failed.";
+
+        loginMessage.style.color = "red";
+    }
 });
 // ===============================
 // LOGOUT
@@ -2387,6 +3029,20 @@ if (savedUser) {
 
     // User is already logged in
     loginPage.style.display = "none";
+
+    loadData().then(() => {
+
+        displayProjects();
+        updateTaskProjectDropdown();
+        updateTaskProjectFilter();
+        displayTasks();
+        updateDashboard();
+
+        loadTeamData().then(() => {
+            displayTeamMembers();
+        });
+
+    });
 
 } else {
 
