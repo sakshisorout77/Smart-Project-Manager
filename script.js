@@ -14,6 +14,7 @@ let tasks = [];
 // ===============================
 
 let teamMembers = [];
+let projectMembers = [];
 
 const ROLE_MANAGER = "Manager";
 const ROLE_CONTRIBUTOR = "Contributor";
@@ -35,6 +36,126 @@ function getUserRole() {
     );
 
     return member ? member.role : null;
+}
+function getProjectRole(projectId) {
+
+    const currentUser = getCurrentUser();
+
+    if (!currentUser || !projectId) {
+        return null;
+    }
+
+    const member = projectMembers.find(
+        member =>
+            member.projectId === projectId &&
+            member.email === currentUser.email
+    );
+
+    return member ? member.role : null;
+}
+function getEffectiveProjectRole(projectId) {
+
+    const projectRole = getProjectRole(projectId);
+
+    if (projectRole) {
+        return projectRole;
+    }
+
+    return getUserRole();
+}
+
+function canManageProject(projectId) {
+
+    const role =
+        getEffectiveProjectRole(projectId);
+
+    return role === ROLE_MANAGER;
+}
+function canWorkOnProject(projectId) {
+
+    const role =
+        getEffectiveProjectRole(projectId);
+
+    return (
+        role === ROLE_MANAGER ||
+        role === ROLE_CONTRIBUTOR
+    );
+}
+async function manageProjectMembers(projectId) {
+
+    if (!isManager()) {
+        alert("Only Manager can manage project members."); 
+        return;
+    }
+
+    if (!projectId) {
+        alert("Project ID not found.");
+        return;
+    }
+
+    if (teamMembers.length === 0) {
+        alert("No team members found.");
+        return;
+    }
+
+    const memberEmails = teamMembers
+        .map(member => member.email)
+        .join("\n");
+
+    const email = prompt(
+        "Enter team member email:\n\n" +
+        memberEmails
+    );
+
+    if (!email) {
+        return;
+    }
+
+    const selectedEmail =
+        email.trim().toLowerCase();
+
+    const member = teamMembers.find(
+        member =>
+            member.email === selectedEmail
+    );
+
+    if (!member) {
+        alert(
+            "This email is not a member of the team."
+        );
+        return;
+    }
+
+    const role = prompt(
+        "Enter project role:\n\nManager\nContributor\nViewer",
+        member.role
+    );
+
+    if (!role) {
+        return;
+    }
+
+    const selectedRole =
+        role.trim();
+
+    if (
+        ![
+            ROLE_MANAGER,
+            ROLE_CONTRIBUTOR,
+            ROLE_VIEWER
+        ].includes(selectedRole)
+    ) {
+        alert(
+            "Invalid role. Please use Manager, Contributor or Viewer."
+        );
+        return;
+    }
+
+    await assignProjectRole(
+        projectId,
+        selectedEmail,
+        selectedRole
+    );
 }
 
 function isManager() {
@@ -61,7 +182,7 @@ async function loadTeamData() {
     try {
 
         const response = await fetch(
-            "http://localhost:3000/api/team?teamId=TEAM001"
+            "https://smart-project-manager-a8cx.onrender.com/api/team?teamId=TEAM001"
         );
 
         const data = await response.json();
@@ -83,7 +204,7 @@ async function loadTeamData() {
         if (teamMembers.length === 0) {
 
             const managerResponse = await fetch(
-                "http://localhost:3000/api/team",
+                "https://smart-project-manager-a8cx.onrender.com/api/team",
                 {
                     method: "POST",
 
@@ -127,13 +248,9 @@ async function loadTeamData() {
 // ===============================
 // SAVE TEAM MEMBERS
 // ===============================
-
 function saveTeamData() {
-
-    localStorage.setItem(
-        "teamMembers",
-        JSON.stringify(teamMembers)
-    );
+    // Team data is now stored in MongoDB.
+    // LocalStorage is no longer used for team members.
 }
 
 
@@ -305,7 +422,7 @@ async function addTeamMember() {
     try {
 
         const response = await fetch(
-            "http://localhost:3000/api/team",
+            "https://smart-project-manager-a8cx.onrender.com/api/team",
             {
                 method: "POST",
 
@@ -316,7 +433,8 @@ async function addTeamMember() {
                 body: JSON.stringify({
                     name: name,
                     email: email,
-                    role: role
+                    role: role,
+                    managerEmail: getCurrentUser().email
                 })
             }
         );
@@ -386,9 +504,15 @@ async function removeTeamMember(index) {
     const currentUser =
         getCurrentUser();
 
+    if (!currentUser) {
+
+        alert("Please login first.");
+
+        return;
+    }
+
     // Manager cannot remove himself
     if (
-        currentUser &&
         member.email === currentUser.email
     ) {
 
@@ -407,10 +531,16 @@ async function removeTeamMember(index) {
     try {
 
         const response = await fetch(
-            "http://localhost:3000/api/team/" +
+            "https://smart-project-manager-a8cx.onrender.com/api/team/" +
             encodeURIComponent(member.email),
             {
-                method: "DELETE"
+                method: "DELETE",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    managerEmail: currentUser.email
+                })
             }
         );
 
@@ -441,7 +571,6 @@ async function removeTeamMember(index) {
         alert("Server connection failed.");
     }
 }
-
 // ===============================
 // CHANGE MEMBER ROLE
 // ===============================
@@ -458,6 +587,16 @@ async function changeMemberRole(index) {
         teamMembers[index];
 
     if (!member) return;
+
+    const currentUser =
+        getCurrentUser();
+
+    if (!currentUser) {
+
+        alert("Please login first.");
+
+        return;
+    }
 
     const newRole =
         prompt(
@@ -485,7 +624,7 @@ async function changeMemberRole(index) {
     try {
 
         const response = await fetch(
-            "http://localhost:3000/api/team/" +
+            "https://smart-project-manager-a8cx.onrender.com/api/team/" +
             encodeURIComponent(member.email),
             {
                 method: "PUT",
@@ -495,7 +634,8 @@ async function changeMemberRole(index) {
                 },
 
                 body: JSON.stringify({
-                    role: newRole
+                    role: newRole,
+                    managerEmail: currentUser.email
                 })
             }
         );
@@ -512,8 +652,10 @@ async function changeMemberRole(index) {
             return;
         }
 
-        member.role = data.member.role;
+        member.role =
+            data.member.role;
 
+        saveTeamData();
         displayTeamMembers();
 
     } catch (error) {
@@ -526,7 +668,6 @@ async function changeMemberRole(index) {
         alert("Server connection failed.");
     }
 }
-
 // ===============================
 // TEAM BUTTON EVENT
 // ===============================
@@ -558,7 +699,7 @@ async function loadData() {
     try {
 
         const response = await fetch(
-            "http://localhost:3000/api/projects?teamId=TEAM001"
+            "https://smart-project-manager-a8cx.onrender.com/api/projects?teamId=TEAM001"
         );
 
         const data = await response.json();
@@ -567,11 +708,12 @@ async function loadData() {
             console.error(data.error);
             projects = [];
         } else {
-            projects = data.map(project => ({
-                name: project.name,
-                createdAt: project.createdAt,
-                progress: project.progress
-            }));
+           projects = data.map(project => ({
+    _id: project._id,
+    name: project.name,
+    createdAt: project.createdAt,
+    progress: project.progress
+}));
         }
 
     } catch (error) {
@@ -588,7 +730,7 @@ async function loadData() {
 try {
 
     const taskResponse = await fetch(
-        "http://localhost:3000/api/tasks?teamId=TEAM001"
+        "https://smart-project-manager-a8cx.onrender.com/api/tasks?teamId=TEAM001"
     );
 
     const taskData = await taskResponse.json();
@@ -602,12 +744,13 @@ try {
     } else {
 
         tasks = taskData.map(task => ({
-            name: task.name,
-            project: task.projectName,
-            priority: task.priority,
-            dueDate: task.dueDate,
-            status: task.status
-        }));
+    _id: task._id,
+    name: task.name,
+    project: task.projectName,
+    priority: task.priority,
+    dueDate: task.dueDate,
+    status: task.status
+}));
 
     }
 
@@ -628,6 +771,35 @@ try {
 
     if (!Array.isArray(tasks)) {
         tasks = [];
+        projectMembers = [];
+
+    for (const project of projects) {
+
+        try {
+
+            const response = await fetch(
+                "https://smart-project-manager-a8cx.onrender.com/api/project-members?projectId=" +
+                encodeURIComponent(project._id) +
+                "&teamId=TEAM001"
+            );
+
+            const data = await response.json();
+
+            if (response.ok && Array.isArray(data)) {
+
+                projectMembers.push(...data);
+
+            }
+
+        } catch (error) {
+
+            console.error(
+                "Load Project Members Error:",
+                error
+            );
+
+        }
+    }
     }
 }
 // ===============================
@@ -665,53 +837,14 @@ const taskMessage =
 // ===============================
 // SAVE USER-SPECIFIC DATA
 // ===============================
-
 function saveData() {
-
-    try {
-
-        const currentUser =
-            JSON.parse(
-                localStorage.getItem("currentUser")
-            );
-
-        if (!currentUser || !currentUser.email) {
-            return;
-        }
-
-        const userKey =
-            currentUser.email
-                .replace(/[^a-zA-Z0-9]/g, "_");
-
-        const projectKey =
-            "projects_" + userKey;
-
-        const taskKey =
-            "tasks_" + userKey;
-
-        localStorage.setItem(
-            projectKey,
-            JSON.stringify(projects)
-        );
-
-        localStorage.setItem(
-            taskKey,
-            JSON.stringify(tasks)
-        );
-
-    } catch (error) {
-
-        console.error(
-            "Error saving user data:",
-            error
-        );
-    }
+    // Project and task data are now stored in MongoDB.
+    // LocalStorage is no longer used for project/task data.
 }
 
 // ===============================
 // CREATE PROJECT
 // ===============================
-
 async function createProject() {
 
     if (isViewer()) {
@@ -723,72 +856,142 @@ async function createProject() {
         return;
     }
 
-    const projectName = projectNameInput.value.trim();
+    const projectName =
+        projectNameInput.value.trim();
 
     if (projectName === "") {
+
         if (message) {
-            message.textContent = "Please enter a project name.";
+            message.textContent =
+                "Please enter a project name.";
         }
+
         return;
     }
 
-    const currentUser = getCurrentUser();
+    const currentUser =
+        getCurrentUser();
 
     if (!currentUser) {
+
         alert("Please login first.");
+
         return;
     }
 
     try {
 
-        const response = await fetch("http://localhost:3000/api/projects", {
-            method: "POST",
+        const response =
+            await fetch(
+                "https://smart-project-manager-a8cx.onrender.com/api/projects",
+                {
+                    method: "POST",
 
-            headers: {
-                "Content-Type": "application/json"
-            },
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
 
-            body: JSON.stringify({
-                name: projectName,
-                createdBy: currentUser.email,
-                teamId: "TEAM001"
-            })
-        });
+                    body: JSON.stringify({
 
-        const data = await response.json();
+                        name:
+                            projectName,
+
+                        createdBy:
+                            currentUser.email,
+
+                        teamId:
+                            "TEAM001"
+
+                    })
+                }
+            );
+
+        const data =
+            await response.json();
 
         if (!response.ok) {
-            alert(data.error || "Unable to create project.");
+
+            alert(
+                data.error ||
+                "Unable to create project."
+            );
+
             return;
         }
 
-        // Add returned project to current UI
-        projects.push({
-            name: data.project.name,
-            createdAt: data.project.createdAt,
-            progress: data.project.progress
+        const newProject = {
+
+            _id:
+                data.project._id,
+
+            name:
+                data.project.name,
+
+            createdAt:
+                data.project.createdAt,
+
+            progress:
+                data.project.progress
+
+        };
+
+        projects.push(
+            newProject
+        );
+
+
+        // Add creator as Project Member immediately
+        projectMembers.push({
+
+            projectId:
+                data.project._id,
+
+            teamId:
+                "TEAM001",
+
+            email:
+                currentUser.email.toLowerCase(),
+
+            role:
+                getUserRole()
+
         });
 
+
         displayProjects();
+
         updateTaskProjectDropdown();
+
         updateTaskProjectFilter();
+
         displayTasks();
+
         updateDashboard();
 
+
         if (message) {
+
             message.textContent =
                 "Project created successfully.";
+
         }
+
 
         projectNameInput.value = "";
 
+
     } catch (error) {
 
-        console.error("Project Error:", error);
+        console.error(
+            "Project Error:",
+            error
+        );
 
         if (message) {
+
             message.textContent =
                 "❌ Server connection failed.";
+
         }
     }
 }
@@ -817,6 +1020,7 @@ function displayProjects() {
 
     container.innerHTML = "";
 
+
     projects.forEach(
         function(project, index) {
 
@@ -831,6 +1035,7 @@ function displayProjects() {
                     }
                 );
 
+
             const completedTasks =
                 projectTasks.filter(
                     function(task) {
@@ -842,7 +1047,9 @@ function displayProjects() {
                     }
                 );
 
+
             let progress = 0;
+
 
             if (projectTasks.length > 0) {
 
@@ -854,6 +1061,7 @@ function displayProjects() {
                         ) * 100
                     );
             }
+
 
             project.progress =
                 progress;
@@ -896,6 +1104,7 @@ function displayProjects() {
             progressBar.className =
                 "progress-bar";
 
+
             const progressFill =
                 document.createElement("div");
 
@@ -905,95 +1114,178 @@ function displayProjects() {
             progressFill.style.height =
                 "100%";
 
+
             progressBar.appendChild(
                 progressFill
             );
 
 
-            const editButton =
-                document.createElement("button");
+            projectCard.appendChild(
+                title
+            );
 
-            editButton.textContent =
-                "✏️ Edit Project";
+            projectCard.appendChild(
+                date
+            );
 
-            editButton.addEventListener(
-                "click",
-                function() {
+            projectCard.appendChild(
+                progressText
+            );
 
-                    editProject(index);
-                }
+            projectCard.appendChild(
+                progressBar
             );
 
 
-            const deleteButton =
-                document.createElement("button");
+            // Project-wise Manager permission
+            if (
+                canManageProject(
+                    project._id
+                )
+            ) {
 
-            deleteButton.textContent =
-                "🗑️ Delete Project";
+                const editButton =
+                    document.createElement(
+                        "button"
+                    );
 
-            deleteButton.addEventListener(
-                "click",
-                function() {
-
-                    deleteProject(index);
-                }
-            );
+                editButton.textContent =
+                    "✏️ Edit Project";
 
 
-            projectCard.appendChild(title);
-            projectCard.appendChild(date);
-            projectCard.appendChild(progressText);
-            projectCard.appendChild(progressBar);
-            projectCard.appendChild(editButton);
-            projectCard.appendChild(deleteButton);
+                editButton.addEventListener(
+                    "click",
+                    function() {
+
+                        editProject(index);
+
+                    }
+                );
+
+
+                projectCard.appendChild(
+                    editButton
+                );
+
+
+                const deleteButton =
+                    document.createElement(
+                        "button"
+                    );
+
+                deleteButton.textContent =
+                    "🗑️ Delete Project";
+
+
+                deleteButton.addEventListener(
+                    "click",
+                    function() {
+
+                        deleteProject(index);
+
+                    }
+                );
+
+
+                projectCard.appendChild(
+                    deleteButton
+                );
+            }
+
+
+            // Only Team Manager can manage project members
+            if (isManager()) {
+
+                const manageMembersButton =
+                    document.createElement(
+                        "button"
+                    );
+
+                manageMembersButton.textContent =
+                    "👥 Manage Members";
+
+
+                manageMembersButton.addEventListener(
+                    "click",
+                    function() {
+
+                        manageProjectMembers(
+                            project._id
+                        );
+
+                    }
+                );
+
+
+                projectCard.appendChild(
+                    manageMembersButton
+                );
+            }
+
+
+            // View Tasks button
             const viewButton =
-    document.createElement("button");
+                document.createElement(
+                    "button"
+                );
 
-viewButton.textContent =
-    "👁️ View Tasks";
+            viewButton.textContent =
+                "👁️ View Tasks";
 
-viewButton.addEventListener(
-    "click",
-    function() {
 
-        const projectFilter =
-            document.getElementById(
-                "taskProjectFilter"
+            viewButton.addEventListener(
+                "click",
+                function() {
+
+                    const projectFilter =
+                        document.getElementById(
+                            "taskProjectFilter"
+                        );
+
+
+                    if (projectFilter) {
+
+                        projectFilter.value =
+                            project.name;
+
+                        displayTasks();
+
+                    }
+
+
+                    const tasksSection =
+                        document.getElementById(
+                            "tasksSection"
+                        );
+
+
+                    if (tasksSection) {
+
+                        tasksSection.scrollIntoView({
+                            behavior: "smooth"
+                        });
+
+                    }
+
+                }
             );
 
-        if (projectFilter) {
 
-            projectFilter.value =
-                project.name;
-
-            displayTasks();
-        }
-
-        const tasksSection =
-            document.getElementById(
-                "tasksSection"
+            projectCard.appendChild(
+                viewButton
             );
 
-        if (tasksSection) {
-
-            tasksSection.scrollIntoView({
-                behavior: "smooth"
-            });
-        }
-    }
-);
-
-projectCard.appendChild(viewButton);
 
             container.appendChild(
                 projectCard
             );
+
         }
     );
 
+
     saveData();
 }
-
 
 // ===============================
 // UPDATE TASK PROJECT DROPDOWN
@@ -1129,10 +1421,7 @@ function updateTaskProjectFilter() {
 
 async function addTask() {
 
-    if (isViewer()) {
-        alert("Viewers cannot add tasks.");
-        return;
-    }
+    
 
     if (!taskNameInput) {
         return;
@@ -1165,6 +1454,24 @@ async function addTask() {
         projectInput
             ? projectInput.value
             : "General";
+            if (projectName !== "General") {
+
+    const project =
+        projects.find(
+            project =>
+                project.name === projectName
+        );
+
+    if (
+        project &&
+        !canWorkOnProject(project._id)
+    ) {
+        alert(
+            "Viewers cannot add tasks to this project."
+        );
+        return;
+    }
+}
 
     const priority =
         taskPriorityInput
@@ -1179,7 +1486,7 @@ async function addTask() {
     try {
 
         const response = await fetch(
-            "http://localhost:3000/api/tasks",
+            "https://smart-project-manager-a8cx.onrender.com/api/tasks",
             {
                 method: "POST",
 
@@ -1209,14 +1516,14 @@ async function addTask() {
         }
 
         // Add task to current UI
-        tasks.push({
-            name: data.task.name,
-            project: data.task.projectName,
-            priority: data.task.priority,
-            dueDate: data.task.dueDate,
-            status: data.task.status,
-            teamId: data.task.teamId
-        });
+       tasks.push({
+    _id: data.task._id,
+    name: data.task.name,
+    project: data.task.projectName,
+    priority: data.task.priority,
+    dueDate: data.task.dueDate,
+    status: data.task.status
+});
 
         displayTasks();
         displayProjects();
@@ -1250,7 +1557,6 @@ async function addTask() {
 // ===============================
 // DISPLAY TASKS
 // ===============================
-
 function displayTasks() {
 
     const tasksContainer =
@@ -1261,7 +1567,6 @@ function displayTasks() {
     if (!tasksContainer) {
         return;
     }
-
 
     const searchInput =
         document.getElementById(
@@ -1278,7 +1583,6 @@ function displayTasks() {
             "taskProjectFilter"
         );
 
-
     const searchText =
         searchInput
             ? searchInput.value
@@ -1286,12 +1590,10 @@ function displayTasks() {
                 .trim()
             : "";
 
-
     const filterValue =
         filterInput
             ? filterInput.value
             : "all";
-
 
     const projectFilterValue =
         projectFilterInput
@@ -1308,23 +1610,17 @@ function displayTasks() {
 
                 const priority =
                     task.priority || "Low";
-                    
+
                 const status =
                     task.status || "Pending";
 
                 const project =
                     task.project || "General";
-                    const dueDate =
-    task.dueDate
-        ? "📅 Due: " + task.dueDate
-        : "📅 No due date";
-
 
                 const matchesSearch =
                     name
                         .toLowerCase()
                         .includes(searchText);
-
 
                 let matchesFilter = true;
 
@@ -1449,8 +1745,10 @@ function displayTasks() {
 
             project.textContent =
                 "Project: " +
-                (task.project ||
-                    "General");
+                (
+                    task.project ||
+                    "General"
+                );
 
 
             const priority =
@@ -1496,435 +1794,904 @@ function displayTasks() {
                 );
 
 
-            const completeButton =
-                document.createElement(
-                    "button"
-                );
+            taskCard.appendChild(
+                title
+            );
 
-            completeButton.textContent =
-                task.status ===
-                "Completed"
-                    ? "✅ Completed"
-                    : "Complete";
+            taskCard.appendChild(
+                project
+            );
 
+            taskCard.appendChild(
+                priority
+            );
 
-            completeButton.addEventListener(
-                "click",
-                function() {
+            taskCard.appendChild(
+                dueDate
+            );
 
-                    completeTask(
-                        originalIndex
-                    );
-                }
+            taskCard.appendChild(
+                status
             );
 
 
-            const editButton =
-                document.createElement(
-                    "button"
+            // =================================
+            // PROJECT-WISE ROLE CHECK
+            // =================================
+
+            const taskProject =
+                projects.find(
+                    function(projectItem) {
+
+                        return (
+                            projectItem.name ===
+                            task.project
+                        );
+
+                    }
                 );
 
-            editButton.textContent =
-                "✏️ Edit";
+
+            const projectId =
+                taskProject
+                    ? taskProject._id
+                    : null;
 
 
-            editButton.addEventListener(
-                "click",
-                function() {
-
-                    editTask(
-                        originalIndex
-                    );
-                }
-            );
-
-
-            const deleteButton =
-                document.createElement(
-                    "button"
+            const canWork =
+                canWorkOnProject(
+                    projectId
                 );
 
-            deleteButton.textContent =
-                "🗑️ Delete";
+
+            const canManage =
+                canManageProject(
+                    projectId
+                );
 
 
-            deleteButton.addEventListener(
-                "click",
-                function() {
+            // =================================
+            // COMPLETE BUTTON
+            // Manager + Contributor
+            // =================================
 
-                    deleteTask(
-                        originalIndex
+            if (canWork) {
+
+                const completeButton =
+                    document.createElement(
+                        "button"
                     );
-                }
-            );
+
+                completeButton.textContent =
+                    task.status ===
+                    "Completed"
+                        ? "✅ Completed"
+                        : "Complete";
 
 
-            taskCard.appendChild(title);
-            taskCard.appendChild(project);
-            taskCard.appendChild(priority);
-            taskCard.appendChild(dueDate);
-            taskCard.appendChild(status);
-            taskCard.appendChild(completeButton);
-            taskCard.appendChild(editButton);
-            taskCard.appendChild(deleteButton);
+                completeButton.addEventListener(
+                    "click",
+                    function() {
+
+                        completeTask(
+                            originalIndex
+                        );
+
+                    }
+                );
+
+
+                taskCard.appendChild(
+                    completeButton
+                );
+            }
+
+
+            // =================================
+            // EDIT BUTTON
+            // Manager + Contributor
+            // =================================
+
+            if (canWork) {
+
+                const editButton =
+                    document.createElement(
+                        "button"
+                    );
+
+                editButton.textContent =
+                    "✏️ Edit";
+
+
+                editButton.addEventListener(
+                    "click",
+                    function() {
+
+                        editTask(
+                            originalIndex
+                        );
+
+                    }
+                );
+
+
+                taskCard.appendChild(
+                    editButton
+                );
+            }
+
+
+            // =================================
+            // DELETE BUTTON
+            // Manager ONLY
+            // =================================
+
+            if (canManage) {
+
+                const deleteButton =
+                    document.createElement(
+                        "button"
+                    );
+
+                deleteButton.textContent =
+                    "🗑️ Delete";
+
+
+                deleteButton.addEventListener(
+                    "click",
+                    function() {
+
+                        deleteTask(
+                            originalIndex
+                        );
+
+                    }
+                );
+
+
+                taskCard.appendChild(
+                    deleteButton
+                );
+            }
 
 
             tasksContainer.appendChild(
                 taskCard
             );
+
         }
     );
 }
-
 
 // ===============================
 // COMPLETE TASK
 // ===============================
 
-function completeTask(index) {
+async function completeTask(index) {
 
-     if (isViewer()) {
-        alert("Viewers cannot complete tasks.");
+    const task = tasks[index];
+
+    if (!task) return;
+
+    const currentUser = getCurrentUser();
+
+    if (!currentUser) {
+        alert("Please login first.");
         return;
     }
 
-    if (!tasks[index]) {
-        return;
-    }
-
-    tasks[index].status =
-        tasks[index].status ===
-        "Completed"
+    const newStatus =
+        task.status === "Completed"
             ? "Pending"
             : "Completed";
 
-    saveData();
+    try {
 
-    displayTasks();
-    displayProjects();
-    updateDashboard();
+        // MongoDB task ID
+        if (!task._id) {
+            alert("Task ID not found. Please refresh the page.");
+            return;
+        }
+
+        const response = await fetch(
+            "https://smart-project-manager-a8cx.onrender.com/api/tasks/" +
+            encodeURIComponent(task._id),
+            {
+                method: "PUT",
+
+                headers: {
+                    "Content-Type": "application/json"
+                },
+
+                body: JSON.stringify({
+
+                    status: newStatus,
+
+                    userEmail:
+                        currentUser.email,
+
+                    teamId:
+                        "TEAM001"
+
+                })
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+
+            alert(
+                data.error ||
+                "Unable to update task."
+            );
+
+            return;
+        }
+
+        // Update local array with MongoDB response
+        tasks[index] = {
+
+            ...tasks[index],
+
+            name:
+                data.task.name,
+
+            project:
+                data.task.projectName,
+
+            priority:
+                data.task.priority,
+
+            dueDate:
+                data.task.dueDate,
+
+            status:
+                data.task.status,
+
+            _id:
+                data.task._id
+        };
+
+
+        displayTasks();
+        displayProjects();
+        updateDashboard();
+
+
+    } catch (error) {
+
+        console.error(
+            "Complete Task Error:",
+            error
+        );
+
+        alert(
+            "Server connection failed."
+        );
+    }
 }
-
 
 // ===============================
 // DELETE TASK
 // ===============================
 
-function deleteTask(index) {
+async function deleteTask(index) {
 
-     if (!isManager()) {
-        alert("Only Manager can delete tasks.");
-        return;
-    }
+   const task = tasks[index];
 
-    if (!tasks[index]) {
-        return;
-    }
+if (!task) return;
 
-    tasks.splice(index, 1);
+const project =
+    projects.find(
+        project =>
+            project.name === task.project
+    );
 
-    saveData();
-
-    displayTasks();
-    displayProjects();
-    updateDashboard();
+if (
+    project &&
+    !canManageProject(project._id)
+) {
+    alert(
+        "Only Project Manager can delete tasks in this project."
+    );
+    return;
 }
 
+    const confirmDelete = confirm(
+        "Are you sure you want to delete this task?"
+    );
 
+    if (!confirmDelete) {
+        return;
+    }
+
+    const currentUser = getCurrentUser();
+
+    if (!currentUser) {
+        alert("Please login first.");
+        return;
+    }
+
+    if (!task._id) {
+        alert("Task ID not found. Please refresh the page.");
+        return;
+    }
+
+    try {
+
+        const response = await fetch(
+            "https://smart-project-manager-a8cx.onrender.com/api/tasks/" +
+            encodeURIComponent(task._id),
+            {
+                method: "DELETE",
+
+                headers: {
+                    "Content-Type": "application/json"
+                },
+
+                body: JSON.stringify({
+                    userEmail: currentUser.email,
+                    teamId: "TEAM001"
+                })
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+
+            alert(
+                data.error ||
+                "Unable to delete task."
+            );
+
+            return;
+        }
+
+        // Remove from local array
+        tasks.splice(index, 1);
+
+        displayTasks();
+        displayProjects();
+        updateDashboard();
+
+        showSettingsMessage(
+            "✅ Task deleted successfully."
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Delete Task Error:",
+            error
+        );
+
+        alert(
+            "Server connection failed."
+        );
+    }
+}
 // ===============================
 // EDIT TASK
 // ===============================
 
-function editTask(index) {
+async function editTask(index) {
 
-      if (isViewer()) {
-        alert("Viewers cannot edit tasks.");
+    const task = tasks[index];
+
+if (!task) return;
+
+const project =
+    projects.find(
+        project =>
+            project.name === task.project
+    );
+
+if (
+    project &&
+    !canWorkOnProject(project._id)
+) {
+    alert(
+        "Viewers cannot edit tasks in this project."
+    );
+    return;
+}
+    const currentUser = getCurrentUser();
+
+    if (!currentUser) {
+        alert("Please login first.");
         return;
     }
 
-    const task =
-        tasks[index];
-
-    if (!task) {
+    if (!task._id) {
+        alert("Task ID not found. Please refresh the page.");
         return;
     }
 
-
-    const newName =
-        prompt(
-            "Enter task name:",
-            task.name
-        );
+    const newName = prompt(
+        "Enter task name:",
+        task.name
+    );
 
     if (newName === null) {
         return;
     }
 
-
-    const updatedName =
-        newName.trim();
-
+    const updatedName = newName.trim();
 
     if (updatedName === "") {
-
-        alert(
-            "Task name cannot be empty."
-        );
-
+        alert("Task name cannot be empty.");
         return;
     }
 
 
-    const newPriority =
-        prompt(
-            "Enter priority (High / Medium / Low):",
-            task.priority
-        );
+    const newPriority = prompt(
+        "Enter priority (High / Medium / Low):",
+        task.priority
+    );
 
     if (newPriority === null) {
         return;
     }
 
-
     const updatedPriority =
-        newPriority
-            .trim()
-            .toLowerCase();
-
+        newPriority.trim().toLowerCase();
 
     if (
         ![
             "high",
             "medium",
             "low"
-        ].includes(
-            updatedPriority
-        )
+        ].includes(updatedPriority)
     ) {
-
         alert(
             "Priority must be High, Medium or Low."
         );
-
         return;
     }
 
 
-    const newDueDate =
-        prompt(
-            "Enter due date:",
-            task.dueDate || ""
-        );
+    const newDueDate = prompt(
+        "Enter due date:",
+        task.dueDate || ""
+    );
 
     if (newDueDate === null) {
         return;
     }
 
 
-    const newStatus =
-        prompt(
-            "Enter status (Pending / Completed):",
-            task.status
-        );
+    const newStatus = prompt(
+        "Enter status (Pending / Completed):",
+        task.status
+    );
 
     if (newStatus === null) {
         return;
     }
 
-
     const updatedStatus =
-        newStatus
-            .trim()
-            .toLowerCase();
-
+        newStatus.trim().toLowerCase();
 
     if (
-        updatedStatus !==
-            "pending" &&
-        updatedStatus !==
-            "completed"
+        updatedStatus !== "pending" &&
+        updatedStatus !== "completed"
     ) {
-
         alert(
             "Status must be Pending or Completed."
         );
-
         return;
     }
 
 
-    task.name =
-        updatedName;
+    try {
+
+        const response = await fetch(
+            "https://smart-project-manager-a8cx.onrender.com/api/tasks/" +
+            encodeURIComponent(task._id),
+            {
+                method: "PUT",
+
+                headers: {
+                    "Content-Type": "application/json"
+                },
+
+                body: JSON.stringify({
+
+                    name: updatedName,
+
+                    priority:
+                        updatedPriority
+                            .charAt(0)
+                            .toUpperCase() +
+                        updatedPriority.slice(1),
+
+                    dueDate:
+                        newDueDate.trim(),
+
+                    status:
+                        updatedStatus
+                            .charAt(0)
+                            .toUpperCase() +
+                        updatedStatus.slice(1),
+
+                    userEmail:
+                        currentUser.email,
+
+                    teamId:
+                        "TEAM001"
+                })
+            }
+        );
 
 
-    task.priority =
-        updatedPriority
-            .charAt(0)
-            .toUpperCase() +
-        updatedPriority.slice(1);
+        const data = await response.json();
 
 
-    task.dueDate =
-        newDueDate.trim();
+        if (!response.ok) {
+
+            alert(
+                data.error ||
+                "Unable to update task."
+            );
+
+            return;
+        }
 
 
-    task.status =
-        updatedStatus
-            .charAt(0)
-            .toUpperCase() +
-        updatedStatus.slice(1);
+        // Update local array with MongoDB data
+        tasks[index] = {
+
+            _id:
+                data.task._id,
+
+            name:
+                data.task.name,
+
+            project:
+                data.task.projectName,
+
+            priority:
+                data.task.priority,
+
+            dueDate:
+                data.task.dueDate,
+
+            status:
+                data.task.status
+        };
 
 
-    saveData();
+        displayTasks();
+        displayProjects();
+        updateDashboard();
 
-    displayTasks();
-    displayProjects();
-    updateDashboard();
+
+        showSettingsMessage(
+            "✅ Task updated successfully."
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            "Edit Task Error:",
+            error
+        );
+
+        alert(
+            "Server connection failed."
+        );
+    }
 }
 // ===============================
 // DELETE PROJECT
 // ===============================
 
-function deleteProject(index) {
+async function deleteProject(index) {
 
-     if (!isManager()) {
-        alert("Only Manager can delete projects.");
+    if (!canManageProject(projects[index]?._id)) {
+    alert("Only Project Manager can delete this project.");
+    return;
+}
+
+    const project = projects[index];
+
+    if (!project) {
         return;
     }
 
-    if (!projects[index]) {
-        return;
-    }
-
-
-    const confirmDelete =
-        confirm(
-            "Are you sure you want to delete this project?"
-        );
-
+    const confirmDelete = confirm(
+        "Are you sure you want to delete this project?"
+    );
 
     if (!confirmDelete) {
         return;
     }
 
+    const currentUser = getCurrentUser();
 
-    const deletedProject =
-        projects[index].name;
+    if (!currentUser) {
+        alert("Please login first.");
+        return;
+    }
 
+    if (!project._id) {
+        alert("Project ID not found. Please refresh the page.");
+        return;
+    }
 
-    projects.splice(index, 1);
+    try {
 
+        const response = await fetch(
+            "https://smart-project-manager-a8cx.onrender.com/api/projects/" +
+            encodeURIComponent(project._id),
+            {
+                method: "DELETE",
 
-    tasks.forEach(
-        function(task) {
+                headers: {
+                    "Content-Type": "application/json"
+                },
 
-            if (
-                task.project ===
-                deletedProject
-            ) {
-
-                task.project =
-                    "General";
+                body: JSON.stringify({
+                    userEmail: currentUser.email,
+                    teamId: "TEAM001"
+                })
             }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            alert(
+                data.error ||
+                "Unable to delete project."
+            );
+            return;
         }
-    );
 
+        // Remove project from local array
+        projects.splice(index, 1);
 
-    saveData();
+        // Move related tasks to General
+        tasks.forEach(function(task) {
 
-    displayProjects();
-    updateTaskProjectDropdown();
-    updateTaskProjectFilter();
-    displayTasks();
-    updateDashboard();
+            if (task.project === project.name) {
+                task.project = "General";
+            }
 
+        });
 
-    showSettingsMessage(
-        "✅ Project deleted successfully."
-    );
+        displayProjects();
+        updateTaskProjectDropdown();
+        updateTaskProjectFilter();
+        displayTasks();
+        updateDashboard();
+
+        showSettingsMessage(
+            "✅ Project deleted successfully."
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Delete Project Error:",
+            error
+        );
+
+        alert("Server connection failed.");
+    }
 }
-
 
 // ===============================
 // EDIT PROJECT
 // ===============================
 
-function editProject(index) {
+async function editProject(index) {
 
-     if (!isManager()) {
-        alert("Only Manager can edit projects.");
+    if (!canManageProject(projects[index]?._id)) {
+    alert("Only Project Manager can edit this project.");
+    return;
+}
+
+    const project = projects[index];
+
+    if (!project) {
         return;
     }
 
-    if (!projects[index]) {
+    const currentUser = getCurrentUser();
+
+    if (!currentUser) {
+        alert("Please login first.");
         return;
     }
 
+    if (!project._id) {
+        alert("Project ID not found. Please refresh the page.");
+        return;
+    }
 
-    const newName =
-        prompt(
-            "Enter new project name:",
-            projects[index].name
-        );
-
+    const newName = prompt(
+        "Enter new project name:",
+        project.name
+    );
 
     if (newName === null) {
         return;
     }
 
-
-    const updatedName =
-        newName.trim();
-
+    const updatedName = newName.trim();
 
     if (updatedName === "") {
-
-        alert(
-            "Project name cannot be empty."
-        );
-
+        alert("Project name cannot be empty.");
         return;
     }
 
+    const oldName = project.name;
 
-    const oldName =
-        projects[index].name;
+    try {
+
+        // Update project in MongoDB
+        const response = await fetch(
+            "https://smart-project-manager-a8cx.onrender.com/api/projects/" +
+            encodeURIComponent(project._id),
+            {
+                method: "PUT",
+
+                headers: {
+                    "Content-Type": "application/json"
+                },
+
+                body: JSON.stringify({
+
+                    name: updatedName,
+
+                    userEmail:
+                        currentUser.email,
+
+                    teamId:
+                        "TEAM001"
+                })
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+
+            alert(
+                data.error ||
+                "Unable to update project."
+            );
+
+            return;
+        }
 
 
-    projects[index].name =
-        updatedName;
+        // Update related tasks in MongoDB
+        const relatedTasks =
+            tasks.filter(function(task) {
+
+                return (
+                    task.project === oldName &&
+                    task._id
+                );
+
+            });
 
 
-    tasks.forEach(
-        function(task) {
+        for (const task of relatedTasks) {
 
-            if (
-                task.project ===
-                oldName
-            ) {
+            const taskResponse =
+                await fetch(
+                    "https://smart-project-manager-a8cx.onrender.com/api/tasks/" +
+                    encodeURIComponent(task._id),
+                    {
+                        method: "PUT",
+
+                        headers: {
+                            "Content-Type":
+                                "application/json"
+                        },
+
+                        body: JSON.stringify({
+
+                            name:
+                                task.name,
+
+                                projectName:
+                                updatedName,
+
+                            priority:
+                                task.priority,
+
+                            dueDate:
+                                task.dueDate,
+
+                            status:
+                                task.status,
+
+                            userEmail:
+                                currentUser.email,
+
+                            teamId:
+                                "TEAM001"
+                        })
+                    }
+                );
+
+
+            if (!taskResponse.ok) {
+
+                console.error(
+                    "Unable to update related task:",
+                    task.name
+                );
+
+            }
+        }
+
+
+        // Update local project
+        projects[index] = {
+
+            _id:
+                data.project._id,
+
+            name:
+                data.project.name,
+
+            createdAt:
+                data.project.createdAt,
+
+            progress:
+                data.project.progress
+        };
+
+
+        // Update local related tasks
+        tasks.forEach(function(task) {
+
+            if (task.project === oldName) {
 
                 task.project =
                     updatedName;
+
             }
-        }
-    );
+
+        });
 
 
-    saveData();
+        displayProjects();
 
-    displayProjects();
-    updateTaskProjectDropdown();
-    updateTaskProjectFilter();
-    displayTasks();
-    updateDashboard();
+        updateTaskProjectDropdown();
+
+        updateTaskProjectFilter();
+
+        displayTasks();
+
+        updateDashboard();
 
 
-    showSettingsMessage(
-        "✅ Project updated successfully."
-    );
+        showSettingsMessage(
+            "✅ Project updated successfully."
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            "Edit Project Error:",
+            error
+        );
+
+        alert(
+            "Server connection failed."
+        );
+    }
 }
-
-
 // ===============================
 // DASHBOARD
 // ===============================
@@ -2396,7 +3163,7 @@ if (askAiBtn) {
 
                 const response =
                     await fetch(
-                        "http://localhost:3000/api/ai",
+                        "https://smart-project-manager-a8cx.onrender.com/api/ai",
                         {
                             method: "POST",
 
@@ -2561,53 +3328,96 @@ function escapeHTML(text) {
 // ADD AI SUGGESTION AS TASK
 // ===============================
 
-function addAiTask() {
+async function addAiTask() {
 
     if (!latestAiSuggestion) {
         return;
     }
 
+    const currentUser =
+        getCurrentUser();
+
+    if (!currentUser) {
+        alert("Please login first.");
+        return;
+    }
+
+    if (isViewer()) {
+        alert("Viewers cannot add tasks.");
+        return;
+    }
 
     const projectInput =
-        document.getElementById(
-            "taskProjectInput"
+        document.getElementById("taskProjectInput");
+
+    const projectName =
+        projectInput
+            ? projectInput.value
+            : "General";
+
+    try {
+
+        const response = await fetch(
+            "https://smart-project-manager-a8cx.onrender.com/api/tasks",
+            {
+                method: "POST",
+
+                headers: {
+                    "Content-Type": "application/json"
+                },
+
+                body: JSON.stringify({
+                    name: latestAiSuggestion,
+                    projectName: projectName,
+                    priority: "Medium",
+                    dueDate: "",
+                    createdBy: currentUser.email,
+                    teamId: "TEAM001"
+                })
+            }
         );
 
+        const data =
+            await response.json();
 
-    const task = {
+        if (!response.ok) {
 
-        name:
-            latestAiSuggestion,
+            alert(
+                data.error ||
+                "Unable to add AI task."
+            );
 
-        project:
-            projectInput
-                ? projectInput.value
-                : "General",
+            return;
+        }
 
-        priority:
-            "Medium",
+        tasks.push({
+            _id: data.task._id,
+            name: data.task.name,
+            project: data.task.projectName,
+            priority: data.task.priority,
+            dueDate: data.task.dueDate,
+            status: data.task.status
+        });
 
-        dueDate:
-            "",
+        displayTasks();
+        displayProjects();
+        updateDashboard();
 
-        status:
-            "Pending"
-    };
+        if (aiTasksContainer) {
+            aiTasksContainer.innerHTML =
+                "<p>✅ AI suggestion added to My Tasks!</p>";
+        }
 
+    } catch (error) {
 
-    tasks.push(task);
+        console.error(
+            "AI Task Error:",
+            error
+        );
 
-    saveData();
-
-    displayTasks();
-    displayProjects();
-    updateDashboard();
-
-
-    if (aiTasksContainer) {
-
-        aiTasksContainer.innerHTML =
-            "<p>✅ AI suggestion added to My Tasks!</p>";
+        alert(
+            "Server connection failed."
+        );
     }
 }
 
@@ -2845,7 +3655,7 @@ registerForm.addEventListener("submit", async function (event) {
 
     try {
 
-        const response = await fetch("http://localhost:3000/api/register", {
+        const response = await fetch("https://smart-project-manager-a8cx.onrender.com/api/register", {
             method: "POST",
 
             headers: {
@@ -2918,7 +3728,7 @@ loginForm.addEventListener("submit", async function (event) {
 
     try {
 
-        const response = await fetch("http://localhost:3000/api/login", {
+        const response = await fetch("https://smart-project-manager-a8cx.onrender.com/api/login", {
             method: "POST",
 
             headers: {
