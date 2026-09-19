@@ -116,7 +116,6 @@ const newUser = new User({
 
 // ==========================================
 // LOGIN
-// ==========================================
 app.post("/api/login", async (req, res) => {
 
     try {
@@ -187,31 +186,49 @@ app.post("/api/login", async (req, res) => {
         }
 
 
-        // Check team membership
+        // Check whether user belongs to the shared team
         const teamMember =
             await Team.findOne({
                 email: userEmail,
                 teamId: "TEAM001"
             });
 
-        if (!teamMember) {
 
-            return res.status(403).json({
-                error: "You are not a member of this team."
+        // Team member
+        if (teamMember) {
+
+            return res.json({
+
+                message: "Login successful!",
+
+                user: {
+                    name: user.name,
+                    email: user.email,
+                    accountType: "team",
+                    teamId: "TEAM001",
+                    role: teamMember.role
+                }
+
             });
+
         }
 
 
-        res.json({
+        // Other registered user
+        return res.json({
 
             message: "Login successful!",
 
             user: {
                 name: user.name,
-                email: user.email
+                email: user.email,
+                accountType: "personal",
+                teamId: null,
+                role: null
             }
 
         });
+
 
     } catch (error) {
 
